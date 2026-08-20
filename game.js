@@ -1,243 +1,319 @@
 const $ = (id) => document.getElementById(id);
 
-const video = $("movieVideo");
-const input = $("typingInput");
-const targetText = $("targetText");
-const typedText = $("typedText");
-const progressBar = $("progressBar");
-const feedback = $("feedback");
-
-const scoreEl = $("score");
-const comboEl = $("combo");
-const accuracyEl = $("accuracy");
-const timerEl = $("timer");
-
+// -----------------------------
+// Éléments HTML
+// -----------------------------
 const startBtn = $("startBtn");
 const againBtn = $("againBtn");
 
 const gamePanel = $("game");
-const homePanel = $("home");
 const endPanel = $("end");
 
-const finalScore = $("finalScore");
+const video = $("video");
+const input = $("typing");
 
+const phrase = $("phrase");
+const bar = $("bar");
+const status = $("status");
+
+const scoreEl = $("score");
+const accuracyEl = $("accuracy");
+const finalScoreEl = $("finalScore");
+
+// -----------------------------
+// Configuration du test
+// -----------------------------
 const TEST_VIDEO = "movies/test/scene01.mp4";
-
-/*
-  Phrase utilisée pour la vidéo de test.
-  Chaque caractère correctement tapé fait avancer
-  la vidéo proportionnellement.
-*/
 const TEST_TEXT = "LA SCENE COMMENCE";
 
+// -----------------------------
+// Variables du jeu
+// -----------------------------
 let score = 0;
 let combo = 0;
-let errors = 0;
 let correctChars = 0;
 let totalChars = 0;
-let startTime = 0;
-let timerInterval = null;
+let started = false;
 let finished = false;
 
-function resetGame() {
-  score = 0;
-  combo = 0;
-  errors = 0;
-  correctChars = 0;
-  totalChars = 0;
-  finished = false;
+// -----------------------------
+// Utilitaires
+// -----------------------------
+function setText(element, text) {
+    if (element) {
+        element.textContent = text;
+    }
+}
 
-  scoreEl.textContent = "0";
-  comboEl.textContent = "0";
-  accuracyEl.textContent = "100%";
-  timerEl.textContent = "00:00";
+function showGame() {
+    if (gamePanel) {
+        gamePanel.classList.remove("hidden");
+    }
 
-  targetText.textContent = TEST_TEXT;
-  typedText.textContent = "";
-  feedback.textContent = "Tape la phrase pour faire avancer la vidéo.";
+    if (endPanel) {
+        endPanel.classList.add("hidden");
+    }
+}
 
-  progressBar.style.width = "0%";
+function showEnd() {
+    if (gamePanel) {
+        gamePanel.classList.add("hidden");
+    }
 
-  input.value = "";
+    if (endPanel) {
+        endPanel.classList.remove("hidden");
+    }
 
-  video.pause();
-  video.currentTime = 0;
+    setText(finalScoreEl, score);
 }
 
 function updateStats() {
-  const accuracy =
-    totalChars === 0
-      ? 100
-      : Math.max(0, Math.round((correctChars / totalChars) * 100));
+    setText(scoreEl, score);
+    
+    const accuracy =
+        totalChars === 0
+            ? 100
+            : Math.round((correctChars / totalChars) * 100);
 
-  accuracyEl.textContent = accuracy + "%";
-  scoreEl.textContent = score;
-  comboEl.textContent = combo;
+    setText(accuracyEl, accuracy + "%");
 }
 
-function updateTimer() {
-  if (!startTime) return;
+function updateProgress() {
+    if (!bar) return;
 
-  const seconds = Math.floor((Date.now() - startTime) / 1000);
+    const length = TEST_TEXT.length;
+    const typed = input ? input.value.length : 0;
 
-  const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const secs = String(seconds % 60).padStart(2, "0");
+    const percent = Math.min(
+        100,
+        Math.round((typed / length) * 100)
+    );
 
-  timerEl.textContent = `${minutes}:${secs}`;
+    bar.style.width = percent + "%";
 }
 
-function startTimer() {
-  clearInterval(timerInterval);
+// -----------------------------
+// Faire avancer la vidéo
+// -----------------------------
+function advanceVideo(percent) {
+    if (!video) return;
 
-  startTime = Date.now();
+    if (!Number.isFinite(video.duration) || video.duration <= 0) {
+        return;
+    }
 
-  timerInterval = setInterval(updateTimer, 250);
+    const targetTime =
+        video.duration * Math.max(0, Math.min(1, percent));
+
+    try {
+        video.currentTime = targetTime;
+    } catch (error) {
+        console.warn("Impossible de déplacer la vidéo :", error);
+    }
 }
 
+// -----------------------------
+// Démarrage
+// -----------------------------
 function startGame() {
-  resetGame();
+    score = 0;
+    combo = 0;
+    correctChars = 0;
+    totalChars = 0;
+    started = true;
+    finished = false;
 
-  homePanel.classList.add("hidden");
-  endPanel.classList.add("hidden");
-  gamePanel.classList.remove("hidden");
+    showGame();
 
-  video.src = TEST_VIDEO;
-  video.load();
+    setText(phrase, TEST_TEXT);
+    setText(status, "Tape la phrase pour faire avancer la scène.");
 
-  startTimer();
+    if (input) {
+        input.value = "";
+        input.disabled = false;
+        input.focus();
+    }
 
-  input.focus();
+    if (video) {
+        video.pause();
+        video.currentTime = 0;
 
-  /*
-    On ne lance pas la vidéo automatiquement.
-    Elle avancera directement avec la frappe.
-  */
+        // On vérifie que la vidéo existe.
+        video.load();
+    }
+
+    if (bar) {
+        bar.style.width = "0%";
+    }
+
+    updateStats();
 }
 
-function updateVideoFromTyping() {
-  const typedLength = input.value.length;
-  const totalLength = TEST_TEXT.length;
+// -----------------------------
+// Vérification de la frappe
+// -----------------------------
+function handleTyping() {
+    if (!started || finished || !input) {
+        return;
+    }
 
-  const ratio = Math.min(typedLength / totalLength, 1);
+    const typed = input.value;
 
-  /*
-    La vidéo de test dure environ 12 secondes.
-    currentTime permet de positionner précisément
-    la vidéo en fonction de la progression.
-  */
-  if (video.duration && Number.isFinite(video.duration)) {
-    video.currentTime = video.duration * ratio;
-  }
+    // Nombre de caractères réellement tapés
+    totalChars = typed.length;
 
-  const percent = ratio * 100;
+    // Vérification caractère par caractère
+    let correct = true;
 
-  progressBar.style.width = percent + "%";
+    for (let i = 0; i < typed.length; i++) {
+        if (typed[i] !== TEST_TEXT[i]) {
+            correct = false;
+            break;
+        }
+    }
 
-  typedText.textContent = input.value;
-}
+    // -------------------------
+    // Erreur
+    // -------------------------
+    if (!correct) {
+        combo = 0;
 
-function finishGame() {
-  if (finished) return;
+        setText(
+            status,
+            "❌ Erreur — la vidéo ne progresse pas."
+        );
 
-  finished = true;
+        updateStats();
 
-  clearInterval(timerInterval);
+        // On remet la frappe au dernier caractère correct.
+        let validLength = 0;
 
-  video.pause();
+        while (
+            validLength < typed.length &&
+            typed[validLength] === TEST_TEXT[validLength]
+        ) {
+            validLength++;
+        }
 
-  finalScore.textContent = score;
+        input.value = typed.substring(0, validLength);
 
-  gamePanel.classList.add("hidden");
-  endPanel.classList.remove("hidden");
-}
+        updateProgress();
 
-input.addEventListener("input", () => {
-  if (finished) return;
+        return;
+    }
 
-  const currentValue = input.value;
-  const expected = TEST_TEXT.substring(0, currentValue.length);
-
-  totalChars++;
-
-  /*
-    On vérifie que tout ce qui est déjà tapé
-    correspond bien au début de la phrase.
-  */
-  if (currentValue === expected) {
-    correctChars++;
-
+    // -------------------------
+    // Caractère correct
+    // -------------------------
+    correctChars = typed.length;
     combo++;
 
     score += 10 + combo;
 
-    feedback.textContent = "✓ Correct";
+    setText(
+        status,
+        "✅ Correct — la scène avance !"
+    );
 
-    updateVideoFromTyping();
+    updateStats();
+    updateProgress();
 
-    /*
-      Si toute la phrase est correcte,
-      la scène arrive à 100 %.
-    */
-    if (currentValue === TEST_TEXT) {
-      progressBar.style.width = "100%";
+    // Progression proportionnelle de la vidéo
+    const percent = typed.length / TEST_TEXT.length;
 
-      if (video.duration && Number.isFinite(video.duration)) {
+    advanceVideo(percent);
+
+    // -------------------------
+    // Phrase terminée
+    // -------------------------
+    if (typed === TEST_TEXT) {
+        finishGame();
+    }
+}
+
+// -----------------------------
+// Fin de la scène
+// -----------------------------
+function finishGame() {
+    if (finished) return;
+
+    finished = true;
+
+    if (input) {
+        input.disabled = true;
+    }
+
+    if (bar) {
+        bar.style.width = "100%";
+    }
+
+    if (video && Number.isFinite(video.duration)) {
         video.currentTime = video.duration;
-      }
-
-      feedback.textContent = "🎬 Scène terminée !";
-
-      setTimeout(finishGame, 800);
-    }
-  } else {
-    errors++;
-
-    combo = 0;
-
-    /*
-      Une erreur ne fait pas avancer la vidéo.
-    */
-    feedback.textContent = "✗ Erreur — corrige ta frappe.";
-
-    /*
-      On remet le champ à la dernière partie correcte.
-    */
-    let correctPart = "";
-
-    for (
-      let i = 0;
-      i < currentValue.length && i < TEST_TEXT.length;
-      i++
-    ) {
-      if (currentValue[i] === TEST_TEXT[i]) {
-        correctPart += currentValue[i];
-      } else {
-        break;
-      }
     }
 
-    input.value = correctPart;
+    setText(
+        status,
+        "🎬 Scène terminée !"
+    );
 
-    updateVideoFromTyping();
-  }
+    setText(finalScoreEl, score);
 
-  updateStats();
-});
+    setTimeout(() => {
+        showEnd();
+    }, 800);
+}
 
-startBtn.addEventListener("click", startGame);
+// -----------------------------
+// Bouton Lancer le test
+// -----------------------------
+if (startBtn) {
+    startBtn.addEventListener("click", startGame);
+}
 
-againBtn.addEventListener("click", startGame);
+// -----------------------------
+// Bouton Recommencer
+// -----------------------------
+if (againBtn) {
+    againBtn.addEventListener("click", startGame);
+}
 
-video.addEventListener("loadedmetadata", () => {
-  video.currentTime = 0;
-});
+// -----------------------------
+// Frappe clavier
+// -----------------------------
+if (input) {
+    input.addEventListener("input", handleTyping);
+}
 
-video.addEventListener("error", () => {
-  feedback.textContent =
-    "⚠️ Impossible de charger la vidéo. Vérifie movies/test/scene01.mp4";
-});
+// -----------------------------
+// Chargement vidéo
+// -----------------------------
+if (video) {
+    video.addEventListener("loadedmetadata", () => {
+        console.log(
+            "Vidéo chargée :",
+            video.duration,
+            "secondes"
+        );
+    });
 
-/*
-  Initialisation
-*/
-resetGame();
+    video.addEventListener("error", () => {
+        console.error(
+            "Impossible de charger la vidéo :",
+            TEST_VIDEO
+        );
+
+        setText(
+            status,
+            "⚠️ Impossible de charger scene01.mp4."
+        );
+    });
+}
+
+// -----------------------------
+// Initialisation
+// -----------------------------
+console.log("🎬 Movie Typing V3 chargé.");
+
+if (phrase) {
+    phrase.textContent = "Appuie sur « Lancer le test ».";
+}
