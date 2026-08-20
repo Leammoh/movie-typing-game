@@ -3,76 +3,60 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Movie Typing Game — V2</title>
+  <title>Movie Typing — V3 Test</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <section id="home" class="screen">
-      <div class="panel hero">
-        <div class="logo">🎬</div>
-        <p class="eyebrow">MOVIE TYPING GAME</p>
-        <h1>Action Typing</h1>
-        <p class="muted">Choisis un film, puis tape les phrases pour faire progresser les scènes.</p>
-        <div id="movieGrid" class="movie-grid"></div>
-        <p class="note">Cette V2 fournit la structure du jeu. Ajoute uniquement des vidéos et textes pour lesquels tu disposes des droits nécessaires.</p>
+  <main class="app">
+    <header>
+      <h1>🎬 MOVIE TYPING</h1>
+      <p>V3 — la scène avance avec ta frappe</p>
+    </header>
+
+    <section id="home" class="panel">
+      <button id="startBtn" class="primary">▶ Lancer le test</button>
+      <p class="hint">
+        Tape les phrases affichées. Chaque caractère correct fait progresser la vidéo.
+      </p>
+    </section>
+
+    <section id="game" class="panel hidden">
+      <div class="hud">
+        <span>Score <b id="score">0</b></span>
+        <span>Combo <b id="combo">0</b></span>
+        <span>Précision <b id="accuracy">100%</b></span>
       </div>
-    </section>
 
-    <section id="game" class="screen hidden">
-      <header class="hud">
-        <button id="backBtn" class="ghost">← Films</button>
-        <div class="hud-title">
-          <span id="movieTitle">Film</span>
-          <small id="sceneLabel">Scène 1 / 1</small>
-        </div>
-        <div class="stats">
-          <span>Score <b id="score">0</b></span>
-          <span>Combo <b id="combo">0</b></span>
-          <span>Précision <b id="accuracy">100%</b></span>
-          <span>Temps <b id="timer">00:00</b></span>
-        </div>
-      </header>
+      <video id="video" controls playsinline preload="metadata">
+        <source src="movies/test/scene01.mp4" type="video/mp4">
+      </video>
 
-      <main class="game">
-        <div class="cinema">
-          <video id="movieVideo" playsinline preload="metadata"></video>
-          <div id="videoMessage" class="video-message hidden">▶ Cliquer pour lancer</div>
-        </div>
+      <div class="phrase" id="phrase">Préparation…</div>
 
-        <div class="typing-panel">
-          <div class="scene-meta">
-            <span id="sceneType">ACTION</span>
-            <span id="sceneHint"></span>
-          </div>
-          <div id="targetText" class="target"></div>
-          <div id="typedText" class="typed"></div>
-          <input id="typingInput" autocomplete="off" autocapitalize="off" spellcheck="false"
-                 placeholder="Tape ici..." aria-label="Phrase à taper">
-          <div class="progress"><div id="progressBar"></div></div>
-          <div class="feedback" id="feedback">Prêt.</div>
-        </div>
-      </main>
-    </section>
+      <input
+        id="typing"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        placeholder="Commence à taper ici…"
+      >
 
-    <section id="results" class="screen hidden">
-      <div class="panel results-panel">
-        <div class="logo">🏆</div>
-        <p class="eyebrow">MISSION TERMINÉE</p>
-        <h2 id="resultTitle">Bravo</h2>
-        <div class="result-grid">
-          <div><span>Score</span><b id="finalScore">0</b></div>
-          <div><span>Précision</span><b id="finalAccuracy">100%</b></div>
-          <div><span>Temps</span><b id="finalTime">00:00</b></div>
-          <div><span>Erreurs</span><b id="finalErrors">0</b></div>
-        </div>
-        <div class="actions">
-          <button id="replayBtn">Rejouer</button>
-          <button id="filmsBtn" class="secondary">Choisir un autre film</button>
-        </div>
+      <div class="progress">
+        <div id="bar"></div>
       </div>
+
+      <p id="status">
+        Tape la phrase pour faire avancer la scène.
+      </p>
     </section>
-  </div>
+
+    <section id="end" class="panel hidden">
+      <h2>🎬 Fin du test</h2>
+      <p>Score : <b id="finalScore">0</b></p>
+      <button id="againBtn" class="primary">↻ Recommencer</button>
+    </section>
+  </main>
+
   <script src="game.js"></script>
 </body>
 </html>
