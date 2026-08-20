@@ -24,7 +24,7 @@ const finalScoreEl = $("finalScore");
 // Configuration du test
 // -----------------------------
 const TEST_VIDEO = "movies/test/scene01.mp4";
-const TEST_TEXT = "LA SCENE COMMENCE";
+const TEST_TEXT = "La scène commence.";
 
 // -----------------------------
 // Variables du jeu
