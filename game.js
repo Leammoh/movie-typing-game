@@ -1,167 +1,243 @@
-const movies = [
-  {id:"terminator1", title:"TERMINATOR", subtitle:"Film 1", folder:"movies/terminator1", scenes:[
-    {file:"scene01.mp4", type:"ACTION", hint:"Exemple — remplace ce texte", text:"Tape ici la phrase de ta scène."},
-    {file:"scene02.mp4", type:"ACTION", hint:"Scène suivante", text:"Une deuxième phrase peut déclencher la suite."}
-  ]},
-  {id:"terminator2", title:"TERMINATOR 2", subtitle:"Judgment Day", folder:"movies/terminator2", scenes:[
-    {file:"scene01.mp4", type:"ACTION", hint:"Scène 1", text:"Tape la phrase correspondant à ta vidéo."},
-    {file:"scene02.mp4", type:"ACTION", hint:"Scène 2", text:"La vidéo continue lorsque la phrase est correcte."}
-  ]},
-  {id:"aliens", title:"ALIENS", subtitle:"Action / SF", folder:"movies/aliens", scenes:[
-    {file:"scene01.mp4", type:"ACTION", hint:"Scène 1", text:"Ajoute ici ton texte sous licence."},
-    {file:"scene02.mp4", type:"ACTION", hint:"Scène 2", text:"Puis ajoute une seconde phrase."}
-  ]},
-  {id:"robocop1", title:"ROBOCOP", subtitle:"Film 1", folder:"movies/robocop1", scenes:[
-    {file:"scene01.mp4", type:"ACTION", hint:"Scène 1", text:"Phrase de la scène à saisir ici."},
-    {file:"scene02.mp4", type:"ACTION", hint:"Scène 2", text:"Phrase suivante de la séquence."}
-  ]},
-  {id:"robocop2", title:"ROBOCOP 2", subtitle:"Action", folder:"movies/robocop2", scenes:[
-    {file:"scene01.mp4", type:"ACTION", hint:"Scène 1", text:"Texte de démonstration à remplacer."},
-    {file:"scene02.mp4", type:"ACTION", hint:"Scène 2", text:"Texte de démonstration à remplacer."}
-  ]}
-];
+const $ = (id) => document.getElementById(id);
 
-const $ = id => document.getElementById(id);
-const home = $("home"), game = $("game"), results = $("results");
-const movieGrid = $("movieGrid"), video = $("movieVideo"), input = $("typingInput");
-const target = $("targetText"), typed = $("typedText"), bar = $("progressBar");
-const feedback = $("feedback"), movieTitle = $("movieTitle"), sceneLabel = $("sceneLabel");
-const scoreEl = $("score"), comboEl = $("combo"), accuracyEl = $("accuracy"), timerEl = $("timer");
+const video = $("movieVideo");
+const input = $("typingInput");
+const targetText = $("targetText");
+const typedText = $("typedText");
+const progressBar = $("progressBar");
+const feedback = $("feedback");
 
-let movieIndex=0, sceneIndex=0, score=0, combo=0, errors=0, attempts=0, correctChars=0;
-let startedAt=0, timerId=null, completed=false, lastInputLength=0;
+const scoreEl = $("score");
+const comboEl = $("combo");
+const accuracyEl = $("accuracy");
+const timerEl = $("timer");
 
-function renderMovieMenu(){
-  movieGrid.innerHTML = "";
-  movies.forEach((m,i)=>{
-    const b=document.createElement("button");
-    b.className="movie-card";
-    b.innerHTML=`<span class="number">0${i+1}</span><h3>${m.title}</h3><p>${m.subtitle}</p>`;
-    b.addEventListener("click",()=>startMovie(i));
-    movieGrid.appendChild(b);
-  });
-}
+const startBtn = $("startBtn");
+const againBtn = $("againBtn");
 
-function startMovie(i){
-  movieIndex=i; sceneIndex=0; score=0; combo=0; errors=0; attempts=0; correctChars=0;
-  startedAt=Date.now(); clearInterval(timerId); timerId=setInterval(updateTimer,100);
-  home.classList.add("hidden"); results.classList.add("hidden"); game.classList.remove("hidden");
-  loadScene();
-}
+const gamePanel = $("game");
+const homePanel = $("home");
+const endPanel = $("end");
 
-function loadScene(){
-  completed=false; lastInputLength=0;
-  const m=movies[movieIndex], s=m.scenes[sceneIndex];
-  movieTitle.textContent=m.title;
-  sceneLabel.textContent=`Scène ${sceneIndex+1} / ${m.scenes.length}`;
-  $("sceneType").textContent=s.type || "ACTION";
-  $("sceneHint").textContent=s.hint || "";
-  target.textContent=s.text;
-  typed.textContent="";
-  input.value="";
-  bar.style.width="0%";
-  feedback.textContent="Prêt.";
-  feedback.style.color="#777";
+const finalScore = $("finalScore");
+
+const TEST_VIDEO = "movies/test/scene01.mp4";
+
+/*
+  Phrase utilisée pour la vidéo de test.
+  Chaque caractère correctement tapé fait avancer
+  la vidéo proportionnellement.
+*/
+const TEST_TEXT = "LA SCENE COMMENCE";
+
+let score = 0;
+let combo = 0;
+let errors = 0;
+let correctChars = 0;
+let totalChars = 0;
+let startTime = 0;
+let timerInterval = null;
+let finished = false;
+
+function resetGame() {
+  score = 0;
+  combo = 0;
+  errors = 0;
+  correctChars = 0;
+  totalChars = 0;
+  finished = false;
+
+  scoreEl.textContent = "0";
+  comboEl.textContent = "0";
+  accuracyEl.textContent = "100%";
+  timerEl.textContent = "00:00";
+
+  targetText.textContent = TEST_TEXT;
+  typedText.textContent = "";
+  feedback.textContent = "Tape la phrase pour faire avancer la vidéo.";
+
+  progressBar.style.width = "0%";
+
+  input.value = "";
 
   video.pause();
-  video.src=`${m.folder}/${s.file}`;
+  video.currentTime = 0;
+}
+
+function updateStats() {
+  const accuracy =
+    totalChars === 0
+      ? 100
+      : Math.max(0, Math.round((correctChars / totalChars) * 100));
+
+  accuracyEl.textContent = accuracy + "%";
+  scoreEl.textContent = score;
+  comboEl.textContent = combo;
+}
+
+function updateTimer() {
+  if (!startTime) return;
+
+  const seconds = Math.floor((Date.now() - startTime) / 1000);
+
+  const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const secs = String(seconds % 60).padStart(2, "0");
+
+  timerEl.textContent = `${minutes}:${secs}`;
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+
+  startTime = Date.now();
+
+  timerInterval = setInterval(updateTimer, 250);
+}
+
+function startGame() {
+  resetGame();
+
+  homePanel.classList.add("hidden");
+  endPanel.classList.add("hidden");
+  gamePanel.classList.remove("hidden");
+
+  video.src = TEST_VIDEO;
   video.load();
 
-  video.play().catch(()=>{
-    $("videoMessage").classList.remove("hidden");
-    feedback.textContent="Clique sur la vidéo si ton navigateur bloque la lecture automatique.";
-  });
+  startTimer();
 
-  updateHUD();
-  setTimeout(()=>input.focus(),150);
+  input.focus();
+
+  /*
+    On ne lance pas la vidéo automatiquement.
+    Elle avancera directement avec la frappe.
+  */
 }
 
-video.addEventListener("click",()=>{
-  video.play().then(()=>$("videoMessage").classList.add("hidden")).catch(()=>{});
-});
+function updateVideoFromTyping() {
+  const typedLength = input.value.length;
+  const totalLength = TEST_TEXT.length;
 
-input.addEventListener("input",()=>{
-  if(completed) return;
-  const wanted=movies[movieIndex].scenes[sceneIndex].text;
-  const value=input.value;
-  typed.textContent=value;
+  const ratio = Math.min(typedLength / totalLength, 1);
 
-  // On compte une tentative uniquement quand un nouveau caractère est saisi.
-  if(value.length>lastInputLength){
-    attempts++;
-    if(wanted[value.length-1] !== value[value.length-1]){
-      errors++;
-      combo=0;
-      feedback.textContent="Erreur de frappe";
-      feedback.style.color="#ff7070";
-    }
+  /*
+    La vidéo de test dure environ 12 secondes.
+    currentTime permet de positionner précisément
+    la vidéo en fonction de la progression.
+  */
+  if (video.duration && Number.isFinite(video.duration)) {
+    video.currentTime = video.duration * ratio;
   }
-  lastInputLength=value.length;
 
-  let same=0;
-  while(same<value.length && same<wanted.length && value[same]===wanted[same]) same++;
-  correctChars=Math.max(correctChars,same);
+  const percent = ratio * 100;
 
-  const pct=Math.min(100,(same/wanted.length)*100);
-  bar.style.width=pct+"%";
-  accuracyEl.textContent=getAccuracy()+"%";
+  progressBar.style.width = percent + "%";
 
-  if(value===wanted) completeScene();
+  typedText.textContent = input.value;
+}
+
+function finishGame() {
+  if (finished) return;
+
+  finished = true;
+
+  clearInterval(timerInterval);
+
+  video.pause();
+
+  finalScore.textContent = score;
+
+  gamePanel.classList.add("hidden");
+  endPanel.classList.remove("hidden");
+}
+
+input.addEventListener("input", () => {
+  if (finished) return;
+
+  const currentValue = input.value;
+  const expected = TEST_TEXT.substring(0, currentValue.length);
+
+  totalChars++;
+
+  /*
+    On vérifie que tout ce qui est déjà tapé
+    correspond bien au début de la phrase.
+  */
+  if (currentValue === expected) {
+    correctChars++;
+
+    combo++;
+
+    score += 10 + combo;
+
+    feedback.textContent = "✓ Correct";
+
+    updateVideoFromTyping();
+
+    /*
+      Si toute la phrase est correcte,
+      la scène arrive à 100 %.
+    */
+    if (currentValue === TEST_TEXT) {
+      progressBar.style.width = "100%";
+
+      if (video.duration && Number.isFinite(video.duration)) {
+        video.currentTime = video.duration;
+      }
+
+      feedback.textContent = "🎬 Scène terminée !";
+
+      setTimeout(finishGame, 800);
+    }
+  } else {
+    errors++;
+
+    combo = 0;
+
+    /*
+      Une erreur ne fait pas avancer la vidéo.
+    */
+    feedback.textContent = "✗ Erreur — corrige ta frappe.";
+
+    /*
+      On remet le champ à la dernière partie correcte.
+    */
+    let correctPart = "";
+
+    for (
+      let i = 0;
+      i < currentValue.length && i < TEST_TEXT.length;
+      i++
+    ) {
+      if (currentValue[i] === TEST_TEXT[i]) {
+        correctPart += currentValue[i];
+      } else {
+        break;
+      }
+    }
+
+    input.value = correctPart;
+
+    updateVideoFromTyping();
+  }
+
+  updateStats();
 });
 
-function completeScene(){
-  completed=true;
-  combo++;
-  const bonus=500+combo*100+Math.max(0,200-errors*10);
-  score+=bonus;
-  feedback.textContent="✓ Séquence validée";
-  feedback.style.color="#fff";
-  updateHUD();
+startBtn.addEventListener("click", startGame);
 
-  setTimeout(()=>{
-    sceneIndex++;
-    if(sceneIndex>=movies[movieIndex].scenes.length) endGame();
-    else loadScene();
-  },850);
-}
+againBtn.addEventListener("click", startGame);
 
-function getAccuracy(){
-  if(attempts===0) return 100;
-  return Math.max(0,Math.round((attempts-errors)/attempts*100));
-}
-
-function updateHUD(){
-  scoreEl.textContent=score;
-  comboEl.textContent=combo;
-  accuracyEl.textContent=getAccuracy()+"%";
-}
-
-function updateTimer(){
-  if(!startedAt)return;
-  timerEl.textContent=formatTime(Date.now()-startedAt);
-}
-
-function formatTime(ms){
-  const s=Math.floor(ms/1000), min=Math.floor(s/60), sec=s%60;
-  return `${String(min).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
-}
-
-function endGame(){
-  clearInterval(timerId); video.pause();
-  $("finalScore").textContent=score;
-  $("finalAccuracy").textContent=getAccuracy()+"%";
-  $("finalTime").textContent=formatTime(Date.now()-startedAt);
-  $("finalErrors").textContent=errors;
-  $("resultTitle").textContent=`${movies[movieIndex].title} terminé`;
-  game.classList.add("hidden"); results.classList.remove("hidden");
-}
-
-$("backBtn").addEventListener("click",()=>{
-  clearInterval(timerId); video.pause(); game.classList.add("hidden"); home.classList.remove("hidden");
+video.addEventListener("loadedmetadata", () => {
+  video.currentTime = 0;
 });
-$("filmsBtn").addEventListener("click",()=>{
-  results.classList.add("hidden"); home.classList.remove("hidden");
-});
-$("replayBtn").addEventListener("click",()=>startMovie(movieIndex));
 
-renderMovieMenu();
+video.addEventListener("error", () => {
+  feedback.textContent =
+    "⚠️ Impossible de charger la vidéo. Vérifie movies/test/scene01.mp4";
+});
+
+/*
+  Initialisation
+*/
+resetGame();
